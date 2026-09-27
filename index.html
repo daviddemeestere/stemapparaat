@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Muziek Studio: Metronoom & Stemapparaten</title>
+  <style>
+    :root {
+      --bg-color: #0d1117;
+      --card-bg: #161b22;
+      --border-color: #30363d;
+      --accent-color: #00e5ff;
+      --text-main: #ffffff;
+      --text-muted: #8b949e;
+      --led-off: #21262d;
+      --led-red: #ff4d4d;
+      --led-orange: #ffaa00;
+      --led-green: #2ea44f;
+    }
+
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    
+    body {
+      margin: 0; padding: 20px 15px; background: var(--bg-color); color: var(--text-main);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      display: flex; flex-direction: column; align-items: center; min-height: 100vh; user-select: none;
+    }
+
+    header { text-align: center; margin-bottom: 15px; width: 100%; max-width: 420px; }
+    h1 { color: var(--accent-color); margin: 0; font-size: 22px; }
+
+    /* Navigatie Tabs */
+    .nav-tabs {
+      display: flex; width: 100%; max-width: 420px; background: var(--card-bg);
+      border: 1px solid var(--border-color); border-radius: 14px; padding: 4px; margin-bottom: 20px;
+    }
+    .tab-btn {
+      flex: 1; padding: 12px 6px; border: none; background: transparent; color: var(--text-muted);
+      font-weight: bold; font-size: 13px; border-radius: 10px; cursor: pointer; transition: all 0.2s;
+    }
+    .tab-btn.active { background: var(--accent-color); color: #0d1117; }
+
+    /* Algemene Panelen */
+    .panel { display: none; width: 100%; max-width: 420px; flex-direction: column; align-items: center; }
+    .panel.active { display: flex; }
+
+    .card {
+      width: 100%; background: var(--card-bg); border: 1px solid var(--border-color);
+      border-radius: 20px; padding: 20px; display: flex; flex-direction: column;
+      align-items: center; box-shadow: 0 6px 20px rgba(0,0,0,0.4); margin-bottom: 15px;
+    }
+
+    /* A4 Hz Calibration Box */
+    .calib-box {
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      margin-bottom: 15px; font-size: 14px; color: var(--text-muted);
+    }
+    .calib-box input {
+      background: #0d1117; border: 1px solid var(--border-color); color: var(--accent-color);
+      padding: 6px 10px; border-radius: 8px; font-weight: bold; width: 70px; text-align: center; font-size: 15px;
+    }
+
+    /* LED Array Display */
+    .led-container {
+      display: flex; justify-content: center; align-items: center; gap: 6px;
+      width: 100%; margin: 20px 0; padding: 12px 8px; background: #0d1117;
+      border-radius: 14px; border: 1px solid var(--border-color);
+    }
+    .led {
+      width: 22px; height: 22px; border-radius: 50%; background: var(--led-off);
+      border: 1px solid #101419; transition: all 0.1s ease-out;
+    }
+    .led.lit-red { background: var(--led-red); box-shadow: 0 0 12px var(--led-red); }
+    .led.lit-orange { background: var(--led-orange); box-shadow: 0 0 12px var(--led-orange); }
+    .led.lit-green { background: var(--led-green); box-shadow: 0 0 15px var(--led-green); }
+
+    /* Display Note Details */
+    .main-note { font-size: 64px; font-weight: 900; line-height: 1; color: var(--text-main); margin: 5px 0; }
+    .sub-note { font-size: 14px; color: var(--text-muted); margin-bottom: 5px; }
+    .freq-detail { font-size: 15px; font-weight: 600; color: var(--accent-color); }
+    .status-msg { font-size: 13px; color: var(--text-muted); margin-top: 10px; min-height: 20px; text-align: center; }
+
+    /* Gitaar Snaren Grid */
+    .strings-grid {
+      display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; width: 100%; margin-top: 10px;
+    }
+    .string-card {
+      background: #0d1117; border: 1px solid var(--border-color); border-radius: 10px;
+      padding: 10px 2px; text-align: center; display: flex; flex-direction: column; align-items: center;
+    }
+    .string-card.active { border-color: var(--accent-color); background: rgba(0, 229, 255, 0.1); }
+    .string-card.in-tune { border-color: var(--led-green); background: rgba(46, 164, 79, 0.2); }
+    .string-card .s-num { font-size: 10px; color: var(--text-muted); }
+    .string-card .s-note { font-size: 16px; font-weight: bold; margin: 2px 0; }
+
+    /* Metronoom Controls */
+    .bpm-display { font-size: 72px; font-weight: 900; color: var(--accent-color); line-height: 1; margin: 10px 0; }
+    .bpm-label { font-size: 14px; color: var(--text-muted); font-weight: bold; letter-spacing: 1px; }
+    .bpm-inputs { display: flex; align-items: center; gap: 15px; width: 100%; margin: 20px 0; }
+    .bpm-inputs input[type="number"] {
+      width: 80px; padding: 10px; background: #0d1117; border: 1px solid var(--border-color);
+      border-radius: 10px; color: white; font-size: 20px; font-weight: bold; text-align: center;
+    }
+    .bpm-inputs input[type="range"] {
+      flex: 1; height: 8px; border-radius: 5px; background: #21262d; accent-color: var(--accent-color);
+    }
+    
+    .btn-action {
+      width: 100%; padding: 16px; border: none; border-radius: 14px; font-size: 18px;
+      font-weight: bold; cursor: pointer; background: var(--accent-color); color: #0d1117;
+      box-shadow: 0 4px 15px rgba(0,229,255,0.25); transition: opacity 0.15s;
+    }
+    .btn-action.active { background: #ff7b72; color: white; box-shadow: 0 4px 15px rgba(255,123,114,0.3); }
+
+    /* Tap overlay voor audio unlock */
+    #unlockOverlay {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(13, 17, 23, 0.95);
+      display: flex; flex-direction: column; justify-content: center; align-items: center;
+      z-index: 9999; text-align: center; padding: 20px;
+    }
+    #unlockOverlay h2 { color: var(--accent-color); margin-bottom: 10px; }
+    #unlockOverlay p { color: var(--text-muted); font-size: 14px; max-width: 300px; margin-bottom: 20px; }
+  </style>
+</head>
+<body>
+
+  <!-- Eerste klik scherm om iOS Audio/Microfoon toe te staan -->
+  <div id="unlockOverlay">
+    <h2>🎵 Muziek Studio</h2>
+    <p>Tik op het scherm om de microfoon en audio-engine te activeren.</p>
+    <button class="btn-action" style="max-width:250px;" onclick="unlockAudio()">Start App</button>
+  </div>
+
+  <header>
+    <h1>🎵 Muziek Studio</h1>
+  </header>
+
+  <nav class="nav-tabs">
+    <button class="tab-btn active" onclick="switchTab('metronome')">⏱️ Metronoom</button>
+    <button class="tab-btn" onclick="switchTab('horn')">📯 Hoorn (F)</button>
+    <button class="tab-btn" onclick="switchTab('guitar')">🎸 Gitaar</button>
+  </nav>
+
+  <!-- TAB 1: METRONOOM -->
+  <section id="panel-metronome" class="panel active">
+    <div class="card">
+      <div class="bpm-label">TEMPO</div>
+      <div class="bpm-display" id="bpmDisplay">120</div>
+      
+      <div class="bpm-inputs">
+        <input type="number" id="bpmInput" value="120" min="30" max="250" oninput="syncBpm(this.value)">
+        <input type="range" id="bpmSlider" value="120" min="30" max="250" oninput="syncBpm(this.value)">
+      </div>
+
+      <button class="btn-action" id="metronomeBtn" onclick="toggleMetronome()">▶️ Start Metronoom</button>
+    </div>
+  </section>
+
+  <!-- TAB 2: HOORN STEMAPPARAAT -->
+  <section id="panel-horn" class="panel">
+    <div class="card">
+      <div class="calib-box">
+        Referentie A4: <input type="number" id="hornA4" value="440" min="410" max="470" onchange="updateCalibration()"> Hz
+      </div>
+
+      <div class="sub-note">GESCHREVEN NOTATIE (HOORN IN F)</div>
+      <div class="main-note" id="hornWrittenNote">--</div>
+      <div class="sub-note" id="hornSoundingNote">Klinkend: --</div>
+      <div class="freq-detail" id="hornFreq">0.0 Hz</div>
+
+      <!-- 11-LED Bar: 4 Rood | 1 Oranje | 1 Groen | 1 Oranje | 4 Rood -->
+      <div class="led-container" id="hornLeds">
+        <div class="led"></div><div class="led"></div><div class="led"></div><div class="led"></div>
+        <div class="led"></div>
+        <div class="led"></div>
+        <div class="led"></div>
+        <div class="led"></div><div class="led"></div><div class="led"></div><div class="led"></div>
+      </div>
+
+      <div class="status-msg" id="hornStatus">Luisteren via microfoon...</div>
+    </div>
+  </section>
+
+  <!-- TAB 3: GITAAR STEMAPPARAAT -->
+  <section id="panel-guitar" class="panel">
+    <div class="card">
+      <div class="calib-box">
+        Referentie A4: <input type="number" id="guitarA4" value="440" min="410" max="470" onchange="updateCalibration()"> Hz
+      </div>
+
+      <div class="main-note" id="guitarNote">--</div>
+      <div class="freq-detail" id="guitarFreq">0.0 Hz</div>
+
+      <!-- 11-LED Bar -->
+      <div class="led-container" id="guitarLeds">
+        <div class="led"></div><div class="led"></div><div class="led"></div><div class="led"></div>
+        <div class="led"></div>
+        <div class="led"></div>
+        <div class="led"></div>
+        <div class="led"></div><div class="led"></div><div class="led"></div><div class="led"></div>
+      </div>
+
+      <div class="status-msg" id="guitarStatus">Tokkel een snaar...</div>
+
+      <div class="strings-grid" id="guitarStringsGrid">
+        <div class="string-card" id="gstr-0"><span class="s-num">6e</span><span class="s-note">E2</span></div>
+        <div class="string-card" id="gstr-1"><span class="s-num">5e</span><span class="s-note">A2</span></div>
+        <div class="string-card" id="gstr-2"><span class="s-num">4e</span><span class="s-note">D3</span></div>
+        <div class="string-card" id="gstr-3"><span class="s-num">3e</span><span class="s-note">G3</span></div>
+        <div class="string-card" id="gstr-4"><span class="s-num">2e</span><span class="s-note">B3</span></div>
+        <div class="string-card" id="gstr-5"><span class="s-num">1e</span><span class="s-note">E4</span></div>
+      </div>
+    </div>
+  </section>
+
+  <script>
+    // Audio Context & Mic
+    let audioCtx = null;
+    let micStream = null;
+    let analyser = null;
+    let activeTab = 'metronome';
+    let isAudioUnlocked = false;
+
+    // Metronoom Variabelen
+    let isMetronomeRunning = false;
+    let bpm = 120;
+    let nextNoteTime = 0.0;
+    let timerID = null;
+
+    // Notennamen
+    const noteNames = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+    
+    // Standaard gitaarsnaren (MIDI nummers: E2=40, A2=45, D3=50, G3=55, B3=59, E4=64)
+    const guitarStrings = [
+      { num: "6e", note: "E2", midi: 40 },
+      { num: "5e", note: "A2", midi: 45 },
+      { num: "4e", note: "D3", midi: 50 },
+      { num: "3e", note: "G3", midi: 55 },
+      { num: "2e", note: "B3", midi: 59 },
+      { num: "1e", note: "E4", midi: 64 }
+    ];
+
+    // Ontgrendel audio voor iOS
+    async function unlockAudio() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioCtx.state === 'suspended') {
+        await audioCtx.resume();
+      }
+      
+      try {
+        micStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        const source = audioCtx.createMediaStreamSource(micStream);
+        analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 2048;
+        source.connect(analyser);
+      } catch(e) {
+        alert("Microfoontoegang is vereist voor de stemapparaten.");
+      }
+
+      isAudioUnlocked = true;
+      document.getElementById('unlockOverlay').style.display = 'none';
+      startPitchDetection();
+    }
+
+    // Switch Tussen Tabs
+    function switchTab(tab) {
+      activeTab = tab;
+      document.querySelectorAll('.tab-btn').forEach((btn, idx) => {
+        btn.classList.toggle('active', ['metronome', 'horn', 'guitar'][idx] === tab);
+      });
+      document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+      document.getElementById('panel-' + tab).classList.add('active');
+    }
+
+    /* --- METRONOOM LOGICA --- */
+    function syncBpm(val) {
+      bpm = Math.max(30, Math.min(250, parseInt(val) || 120));
+      document.getElementById('bpmDisplay').innerText = bpm;
+      document.getElementById('bpmInput').value = bpm;
+      document.getElementById('bpmSlider').value = bpm;
+    }
+
+    function toggleMetronome() {
+      if (!isAudioUnlocked) return;
+      isMetronomeRunning = !isMetronomeRunning;
+      const btn = document.getElementById('metronomeBtn');
+      
+      if (isMetronomeRunning) {
+        nextNoteTime = audioCtx.currentTime + 0.05;
+        btn.innerText = "⏹️ Stop Metronoom";
+        btn.classList.add('active');
+        scheduler();
+      } else {
+        btn.innerText = "▶️ Start Metronoom";
+        btn.classList.remove('active');
+        clearTimeout(timerID);
+      }
+    }
+
+    function scheduler() {
+      while (nextNoteTime < audioCtx.currentTime + 0.1) {
+        playClick(nextNoteTime);
+        nextNoteTime += 60.0 / bpm;
+      }
+      if (isMetronomeRunning) {
+        timerID = setTimeout(scheduler, 25);
+      }
+    }
+
+    function playClick(time) {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.frequency.value = 1000;
+      gain.gain.setValueAtTime(1, time);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + 0.05);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start(time);
+      osc.stop(time + 0.05);
+    }
+
+    /* --- PITCH DETECTION ENGINE --- */
+    function startPitchDetection() {
+      const buf = new Float32Array(2048);
+      
+      function process() {
+        if (analyser && isAudioUnlocked) {
+          analyser.getFloatTimeDomainData(buf);
+          const freq = autoCorrelate(buf, audioCtx.sampleRate);
+
+          if (activeTab === 'horn') {
+            processHornTuner(freq);
+          } else if (activeTab === 'guitar') {
+            processGuitarTuner(freq);
+          }
+        }
+        requestAnimationFrame(process);
+      }
+      process();
+    }
+
+    function getA4(id) {
+      return parseFloat(document.getElementById(id).value) || 440;
+    }
+
+    function updateCalibration() {
+      const hA4 = getA4('hornA4');
+      const gA4 = getA4('guitarA4');
+      document.getElementById('hornA4').value = hA4;
+      document.getElementById('guitarA4').value = gA4;
+    }
+
+    /* --- HOORN STEMMAPPARAAT (IN F) --- */
+    function processHornTuner(freq) {
+      const ledsContainer = document.getElementById('hornLeds');
+      if (freq === -1) {
+        updateLeds(ledsContainer, null);
+        document.getElementById('hornWrittenNote').innerText = "--";
+        document.getElementById('hornSoundingNote').innerText = "Klinkend: --";
+        document.getElementById('hornFreq').innerText = "0.0 Hz";
+        document.getElementById('hornStatus').innerText = "Luisteren naar hoorn...";
+        return;
+      }
+
+      const a4 = getA4('hornA4');
+      // Bereken klinkend MIDI-nummer
+      const midiSounding = Math.round(12 * Math.log2(freq / a4)) + 69;
+      const soundingNoteName = noteNames[midiSounding % 12] + (Math.floor(midiSounding / 12) - 1);
+
+      // Hoorn in F klinkt een reine kwint (7 halve tonen) LAGER dan geschreven.
+      // Dus geschreven noot = klinkende noot + 7 halve tonen.
+      const midiWritten = midiSounding + 7;
+      const writtenNoteName = noteNames[midiWritten % 12] + (Math.floor(midiWritten / 12) - 1);
+
+      // Doelfrequentie berekenen voor klinkende toon
+      const targetFreq = a4 * Math.pow(2, (midiSounding - 69) / 12);
+      const cents = Math.floor(1200 * Math.log2(freq / targetFreq));
+
+      document.getElementById('hornWrittenNote').innerText = writtenNoteName;
+      document.getElementById('hornSoundingNote').innerText = "Klinkend: " + soundingNoteName;
+      document.getElementById('hornFreq').innerText = freq.toFixed(1) + " Hz (Doel: " + targetFreq.toFixed(1) + " Hz)";
+      
+      updateLeds(ledsContainer, cents);
+      document.getElementById('hornStatus').innerText = getCentsStatusText(cents);
+    }
+
+    /* --- GITAAR STEMMAPPARAAT (AUTOMATISCH) --- */
+    function processGuitarTuner(freq) {
+      const ledsContainer = document.getElementById('guitarLeds');
+      resetGuitarStringUI();
+
+      if (freq === -1) {
+        updateLeds(ledsContainer, null);
+        document.getElementById('guitarNote').innerText = "--";
+        document.getElementById('guitarFreq').innerText = "0.0 Hz";
+        document.getElementById('guitarStatus').innerText = "Tokkel een snaar...";
+        return;
+      }
+
+      const a4 = getA4('guitarA4');
+      
+      // Zoek dichtstbijzijnde gitaarsnaar
+      let closestStringIdx = 0;
+      let minDiff = 9999;
+
+      guitarStrings.forEach((s, idx) => {
+        const stringTargetFreq = a4 * Math.pow(2, (s.midi - 69) / 12);
+        const diff = Math.abs(freq - stringTargetFreq);
+        if (diff < minDiff) {
+          minDiff = diff;
+          closestStringIdx = idx;
+        }
+      });
+
+      const matchedString = guitarStrings[closestStringIdx];
+      const stringTargetFreq = a4 * Math.pow(2, (matchedString.midi - 69) / 12);
+      const cents = Math.floor(1200 * Math.log2(freq / stringTargetFreq));
+
+      // UI Updaten
+      document.getElementById('guitarNote').innerText = matchedString.note;
+      document.getElementById('guitarFreq').innerText = freq.toFixed(1) + " Hz (Doel: " + stringTargetFreq.toFixed(1) + " Hz)";
+      
+      const strCard = document.getElementById('gstr-' + closestStringIdx);
+      if (Math.abs(cents) <= 3) {
+        strCard.classList.add('in-tune');
+      } else {
+        strCard.classList.add('active');
+      }
+
+      updateLeds(ledsContainer, cents);
+      document.getElementById('guitarStatus').innerText = getCentsStatusText(cents);
+    }
+
+    function resetGuitarStringUI() {
+      for (let i = 0; i < 6; i++) {
+        const el = document.getElementById('gstr-' + i);
+        if (el) el.className = 'string-card';
+      }
+    }
+
+    /* --- LED ARRAY RENDERER (11 LEDS) --- */
+    // Structuur: [R4, R3, R2, R1, O1, G, O2, R5, R6, R7, R8]
+    function updateLeds(container, cents) {
+      const leds = container.querySelectorAll('.led');
+      leds.forEach(l => l.className = 'led');
+
+      if (cents === null) return;
+
+      let targetIdx = 5; // Midden (Groen)
+
+      if (cents < -40) targetIdx = 0;      // Rood ver links
+      else if (cents < -30) targetIdx = 1; // Rood
+      else if (cents < -20) targetIdx = 2; // Rood
+      else if (cents < -12) targetIdx = 3; // Rood
+      else if (cents < -3)  targetIdx = 4; // Oranje links
+      else if (cents <= 3)  targetIdx = 5; // Groen midden
+      else if (cents <= 12) targetIdx = 6; // Oranje rechts
+      else if (cents <= 20) targetIdx = 7; // Rood
+      else if (cents <= 30) targetIdx = 8; // Rood
+      else if (cents <= 40) targetIdx = 9; // Rood
+      else targetIdx = 10;                 // Rood ver rechts
+
+      if (targetIdx === 5) {
+        leds[targetIdx].classList.add('lit-green');
+      } else if (targetIdx === 4 || targetIdx === 6) {
+        leds[targetIdx].classList.add('lit-orange');
+      } else {
+        leds[targetIdx].classList.add('lit-red');
+      }
+    }
+
+    function getCentsStatusText(cents) {
+      if (Math.abs(cents) <= 3) return "🎯 PERFECT IN STEM!";
+      if (cents < 0) return "⏬ TE LAAG (" + cents + " cents)";
+      return "⏫ TE HOOG (+" + cents + " cents)";
+    }
+
+    /* --- AUTOCORRELATIE (PITCH DETECTION ALGORITME) --- */
+    function autoCorrelate(buf, sampleRate) {
+      let sum = 0;
+      for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i];
+      let rms = Math.sqrt(sum / buf.length);
+      if (rms < 0.01) return -1; // Ruisdrempel
+
+      let r1 = 0, r2 = buf.length - 1, thres = 0.2;
+      for (let i = 0; i < buf.length / 2; i++) {
+        if (Math.abs(buf[i]) < thres) { r1 = i; break; }
+      }
+      for (let i = 1; i < buf.length / 2; i++) {
+        if (Math.abs(buf[buf.length - i]) < thres) { r2 = buf.length - i; break; }
+      }
+
+      buf = buf.slice(r1, r2);
+      let c = new Float32Array(buf.length);
+      for (let i = 0; i < buf.length; i++) {
+        for (let j = 0; j < buf.length - i; j++) c[i] = c[i] + buf[j] * buf[j + i];
+      }
+
+      let d = 0;
+      while (c[d] > c[d + 1]) d++;
+      let maxval = -1, maxpos = -1;
+      for (let i = d; i < buf.length; i++) {
+        if (c[i] > maxval) { maxval = c[i]; maxpos = i; }
+      }
+      let T0 = maxpos;
+
+      let x1 = c[T0 - 1], x2 = c[T0], x3 = c[T0 + 1];
+      let a = (x1 + x3 - 2 * x2) / 2, b = (x3 - x1) / 2;
+      if (a) T0 = T0 - b / (2 * a);
+
+      return sampleRate / T0;
+    }
+  </script>
+</body>
+</html>

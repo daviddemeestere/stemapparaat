@@ -113,25 +113,9 @@
       box-shadow: 0 4px 15px rgba(0,229,255,0.25); transition: opacity 0.15s;
     }
     .btn-action.active { background: #ff7b72; color: white; box-shadow: 0 4px 15px rgba(255,123,114,0.3); }
-
-    /* Tap overlay voor audio unlock */
-    #unlockOverlay {
-      position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(13, 17, 23, 0.95);
-      display: flex; flex-direction: column; justify-content: center; align-items: center;
-      z-index: 9999; text-align: center; padding: 20px;
-    }
-    #unlockOverlay h2 { color: var(--accent-color); margin-bottom: 10px; }
-    #unlockOverlay p { color: var(--text-muted); font-size: 14px; max-width: 300px; margin-bottom: 20px; }
   </style>
 </head>
 <body>
-
-  <!-- Eerste klik scherm om iOS Audio/Microfoon toe te staan -->
-  <div id="unlockOverlay">
-    <h2>🎵 Muziek Studio</h2>
-    <p>Tik op het scherm om de microfoon en audio-engine te activeren.</p>
-    <button class="btn-action" style="max-width:250px;" onclick="unlockAudio()">Start App</button>
-  </div>
 
   <header>
     <h1>🎵 Muziek Studio</h1>
@@ -170,7 +154,6 @@
       <div class="sub-note" id="hornSoundingNote">Klinkend: --</div>
       <div class="freq-detail" id="hornFreq">0.0 Hz</div>
 
-      <!-- 11-LED Bar: 4 Rood | 1 Oranje | 1 Groen | 1 Oranje | 4 Rood -->
       <div class="led-container" id="hornLeds">
         <div class="led"></div><div class="led"></div><div class="led"></div><div class="led"></div>
         <div class="led"></div>
@@ -179,7 +162,7 @@
         <div class="led"></div><div class="led"></div><div class="led"></div><div class="led"></div>
       </div>
 
-      <div class="status-msg" id="hornStatus">Luisteren via microfoon...</div>
+      <div class="status-msg" id="hornStatus">Tik op het scherm om te starten...</div>
     </div>
   </section>
 
@@ -193,7 +176,6 @@
       <div class="main-note" id="guitarNote">--</div>
       <div class="freq-detail" id="guitarFreq">0.0 Hz</div>
 
-      <!-- 11-LED Bar -->
       <div class="led-container" id="guitarLeds">
         <div class="led"></div><div class="led"></div><div class="led"></div><div class="led"></div>
         <div class="led"></div>
@@ -202,7 +184,7 @@
         <div class="led"></div><div class="led"></div><div class="led"></div><div class="led"></div>
       </div>
 
-      <div class="status-msg" id="guitarStatus">Tokkel een snaar...</div>
+      <div class="status-msg" id="guitarStatus">Tik op het scherm om te starten...</div>
 
       <div class="strings-grid" id="guitarStringsGrid">
         <div class="string-card" id="gstr-0"><span class="s-num">6e</span><span class="s-note">E2</span></div>
@@ -216,12 +198,13 @@
   </section>
 
   <script>
-    // Audio Context & Mic
+    // Audio Context, Mic & WakeLock
     let audioCtx = null;
     let micStream = null;
     let analyser = null;
     let activeTab = 'metronome';
     let isAudioUnlocked = false;
+    let wakeLock = null;
 
     // Metronoom Variabelen
     let isMetronomeRunning = false;
@@ -229,10 +212,8 @@
     let nextNoteTime = 0.0;
     let timerID = null;
 
-    // Notennamen
     const noteNames = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
     
-    // Standaard gitaarsnaren (MIDI nummers: E2=40, A2=45, D3=50, G3=55, B3=59, E4=64)
     const guitarStrings = [
       { num: "6e", note: "E2", midi: 40 },
       { num: "5e", note: "A2", midi: 45 },
@@ -242,8 +223,37 @@
       { num: "1e", note: "E4", midi: 64 }
     ];
 
-    // Ontgrendel audio voor iOS
+    // Automatische activatie bij de eerste schermtik
+    window.addEventListener('click', initAudioAndWakeLock, { once: true });
+    window.addEventListener('touchstart', initAudioAndWakeLock, { once: true });
+
+    async function initAudioAndWakeLock() {
+      await unlockAudio();
+      await requestWakeLock();
+    }
+
+    /* --- SCREEN WAKE LOCK (SCHERM AAN HOUDEN STIL ZONDER MELDING) --- */
+    async function requestWakeLock() {
+      try {
+        if ('wakeLock' in navigator) {
+          wakeLock = await navigator.wakeLock.request('screen');
+        }
+      } catch (err) {
+        console.log("Wake Lock niet toegestaan:", err.message);
+      }
+    }
+
+    // Heractiveer schermbeveiliging als de gebruiker terugkeert naar de app
+    document.addEventListener('visibilitychange', async () => {
+      if (wakeLock !== null && document.visibilityState === 'visible') {
+        await requestWakeLock();
+      }
+    });
+
+    // Audio Engine
     async function unlockAudio() {
+      if (isAudioUnlocked) return;
+      
       if (!audioCtx) {
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
       }
@@ -257,16 +267,17 @@
         analyser = audioCtx.createAnalyser();
         analyser.fftSize = 2048;
         source.connect(analyser);
+
+        document.getElementById('hornStatus').innerText = "Luisteren via microfoon...";
+        document.getElementById('guitarStatus').innerText = "Tokkel een snaar...";
       } catch(e) {
-        alert("Microfoontoegang is vereist voor de stemapparaten.");
+        console.log("Microfoon geblokkeerd of niet beschikbaar.");
       }
 
       isAudioUnlocked = true;
-      document.getElementById('unlockOverlay').style.display = 'none';
       startPitchDetection();
     }
 
-    // Switch Tussen Tabs
     function switchTab(tab) {
       activeTab = tab;
       document.querySelectorAll('.tab-btn').forEach((btn, idx) => {
@@ -285,7 +296,7 @@
     }
 
     function toggleMetronome() {
-      if (!isAudioUnlocked) return;
+      if (!isAudioUnlocked) unlockAudio();
       isMetronomeRunning = !isMetronomeRunning;
       const btn = document.getElementById('metronomeBtn');
       
@@ -367,16 +378,12 @@
       }
 
       const a4 = getA4('hornA4');
-      // Bereken klinkend MIDI-nummer
       const midiSounding = Math.round(12 * Math.log2(freq / a4)) + 69;
       const soundingNoteName = noteNames[midiSounding % 12] + (Math.floor(midiSounding / 12) - 1);
 
-      // Hoorn in F klinkt een reine kwint (7 halve tonen) LAGER dan geschreven.
-      // Dus geschreven noot = klinkende noot + 7 halve tonen.
       const midiWritten = midiSounding + 7;
       const writtenNoteName = noteNames[midiWritten % 12] + (Math.floor(midiWritten / 12) - 1);
 
-      // Doelfrequentie berekenen voor klinkende toon
       const targetFreq = a4 * Math.pow(2, (midiSounding - 69) / 12);
       const cents = Math.floor(1200 * Math.log2(freq / targetFreq));
 
@@ -388,7 +395,7 @@
       document.getElementById('hornStatus').innerText = getCentsStatusText(cents);
     }
 
-    /* --- GITAAR STEMMAPPARAAT (AUTOMATISCH) --- */
+    /* --- GITAAR STEMMAPPARAAT --- */
     function processGuitarTuner(freq) {
       const ledsContainer = document.getElementById('guitarLeds');
       resetGuitarStringUI();
@@ -403,7 +410,6 @@
 
       const a4 = getA4('guitarA4');
       
-      // Zoek dichtstbijzijnde gitaarsnaar
       let closestStringIdx = 0;
       let minDiff = 9999;
 
@@ -420,7 +426,6 @@
       const stringTargetFreq = a4 * Math.pow(2, (matchedString.midi - 69) / 12);
       const cents = Math.floor(1200 * Math.log2(freq / stringTargetFreq));
 
-      // UI Updaten
       document.getElementById('guitarNote').innerText = matchedString.note;
       document.getElementById('guitarFreq').innerText = freq.toFixed(1) + " Hz (Doel: " + stringTargetFreq.toFixed(1) + " Hz)";
       
@@ -443,26 +448,25 @@
     }
 
     /* --- LED ARRAY RENDERER (11 LEDS) --- */
-    // Structuur: [R4, R3, R2, R1, O1, G, O2, R5, R6, R7, R8]
     function updateLeds(container, cents) {
       const leds = container.querySelectorAll('.led');
       leds.forEach(l => l.className = 'led');
 
       if (cents === null) return;
 
-      let targetIdx = 5; // Midden (Groen)
+      let targetIdx = 5;
 
-      if (cents < -40) targetIdx = 0;      // Rood ver links
-      else if (cents < -30) targetIdx = 1; // Rood
-      else if (cents < -20) targetIdx = 2; // Rood
-      else if (cents < -12) targetIdx = 3; // Rood
-      else if (cents < -3)  targetIdx = 4; // Oranje links
-      else if (cents <= 3)  targetIdx = 5; // Groen midden
-      else if (cents <= 12) targetIdx = 6; // Oranje rechts
-      else if (cents <= 20) targetIdx = 7; // Rood
-      else if (cents <= 30) targetIdx = 8; // Rood
-      else if (cents <= 40) targetIdx = 9; // Rood
-      else targetIdx = 10;                 // Rood ver rechts
+      if (cents < -40) targetIdx = 0;
+      else if (cents < -30) targetIdx = 1;
+      else if (cents < -20) targetIdx = 2;
+      else if (cents < -12) targetIdx = 3;
+      else if (cents < -3)  targetIdx = 4;
+      else if (cents <= 3)  targetIdx = 5;
+      else if (cents <= 12) targetIdx = 6;
+      else if (cents <= 20) targetIdx = 7;
+      else if (cents <= 30) targetIdx = 8;
+      else if (cents <= 40) targetIdx = 9;
+      else targetIdx = 10;
 
       if (targetIdx === 5) {
         leds[targetIdx].classList.add('lit-green');
@@ -479,12 +483,12 @@
       return "⏫ TE HOOG (+" + cents + " cents)";
     }
 
-    /* --- AUTOCORRELATIE (PITCH DETECTION ALGORITME) --- */
+    /* --- AUTOCORRELATIE --- */
     function autoCorrelate(buf, sampleRate) {
       let sum = 0;
       for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i];
       let rms = Math.sqrt(sum / buf.length);
-      if (rms < 0.01) return -1; // Ruisdrempel
+      if (rms < 0.01) return -1;
 
       let r1 = 0, r2 = buf.length - 1, thres = 0.2;
       for (let i = 0; i < buf.length / 2; i++) {
